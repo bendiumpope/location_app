@@ -40,6 +40,9 @@ import com.google.android.gms.maps.model.PolylineOptions
 import com.google.maps.android.PolyUtil
 import com.itex.locationapp.data.LocationData
 import com.itex.locationapp.data.viewmodel.LocationViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.IOException
 
@@ -116,16 +119,17 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
         return super.onOptionsItemSelected(item)
     }
 
+
     override fun onMapReady(googleMap: GoogleMap?){
         this.googleMap = googleMap
-        val latLngOrigin = LatLng(startLocations[0].latitude,startLocations[0].longitude) // Start(Start Location)
+        val latLngOrigin = LatLng(startLocations[startLocations.size-1].latitude,startLocations[startLocations.size-1].longitude) // Start(Start Location)
         val latLngDestination = LatLng(startLat!!,startLong!!)
         this.googleMap!!.addMarker(MarkerOptions().position(latLngOrigin).title("Start"))
         this.googleMap!!.addMarker(MarkerOptions().position(latLngDestination).title("Stop"))
         this.googleMap!!.moveCamera(CameraUpdateFactory.newLatLngZoom(latLngOrigin, 14.5f))
 
             val path: MutableList<List<LatLng>> = ArrayList()
-            val urlDirections = "https://maps.googleapis.com/maps/api/directions/json?origin=${startLocations[0].latitude},${startLocations[0].longitude}" +
+            val urlDirections = "https://maps.googleapis.com/maps/api/directions/json?origin=${startLocations[startLocations.size-1].latitude},${startLocations[startLocations.size-1].longitude}" +
                     "&destination=${startLat},${startLong}&key=AIzaSyDQFtmjF3fkjYkQI04WqQCzcPqUbU4CmDw"
 
             val directionsRequest = object : StringRequest(Request.Method.GET, urlDirections, Response.Listener<String> { response ->
@@ -135,6 +139,7 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
                 val legs = routes.getJSONObject(0).getJSONArray("legs")
                 val steps = legs.getJSONObject(0).getJSONArray("steps")
                 val distance =steps.getJSONObject(0).getJSONObject("distance").get("text")
+
 
                 //Setting the distance Covered to the view
                 findViewById<TextView>(R.id.distance).text = distance.toString()
@@ -165,16 +170,16 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
                 startBtn.visibility=View.GONE
                 stopBtn.visibility=View.VISIBLE
 
-                modelView.getLocationDatas(this).observe(this, Observer<List<LocationData>>{ locationData ->
+            }else{
 
-                    locationData?.let {
+                Toast.makeText(this, "Turn on location", Toast.LENGTH_LONG).show()
 
-                        startLocations = locationData
-
-                    }
-                })
-
+                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                startActivity(intent)
             }
+        }else{
+
+            RequestPermission()
         }
 
     }
@@ -188,18 +193,26 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
                 RequestNewLocation()
                 if(CheckInternetConnectivity()){
 
+
                     startBtn.visibility=View.VISIBLE
                     stopBtn.visibility=View.GONE
 
                     mapFragment.getMapAsync(this)
                 }
 
+            }else{
 
+                Toast.makeText(this, "Turn on location", Toast.LENGTH_LONG).show()
 
-
+                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                startActivity(intent)
             }
+        }else{
+
+            RequestPermission()
         }
     }
+
 
     private fun CheckInternetConnectivity(): Boolean{
 
@@ -217,13 +230,10 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
             return true
     }
 
+
     //Getting user location
     @SuppressLint("MissingPermission")
     private fun RequestNewLocation(){
-
-        if(CheckLocationPermission()){
-
-            if(IsLocationEnabled()){
 
                 var locationRequest = LocationRequest()
                 locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
@@ -235,21 +245,8 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
                 fusedLocationClient.requestLocationUpdates(
                     locationRequest, LocationCallBack, Looper.myLooper()
                 )
-
-
-            }else{
-
-                Toast.makeText(this, "Turn on location", Toast.LENGTH_LONG).show()
-
-                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                startActivity(intent)
-            }
-        }else{
-
-            RequestPermission()
-        }
-
     }
+
 
     private val LocationCallBack = object: LocationCallback(){
         override fun onLocationResult(locationResult: LocationResult?) {
@@ -265,7 +262,6 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
             startLat = location.latitude
             startLong = location.longitude
 
-            Toast.makeText(this@HomeActivity, "start: ${startLat}, stop: ${startLong}", Toast.LENGTH_LONG).show()
 
             val captureLocationData =
                 LocationData(
@@ -275,10 +271,22 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
 
                 )
 
-            modelView.setLocationDatas(captureLocationData, this@HomeActivity)
+            GlobalScope.launch (Dispatchers.Main){
+
+                modelView.setLocationDatas(captureLocationData, this@HomeActivity)
+
+                modelView.getLocationDatas(this@HomeActivity).observe(this@HomeActivity, Observer<List<LocationData>>{ locationData ->
+
+                    locationData?.let {
+
+                        startLocations = locationData
+
+                    }
+                })
+
+            }
+
             Toast.makeText(this@HomeActivity, "Location Saved", Toast.LENGTH_SHORT).show()
-
-
 
         }
     }
@@ -307,13 +315,14 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
         return false
     }
 
-    //Asking for Location permission
 
+    //Asking for Location permission
     private fun RequestPermission(){
         ActivityCompat.requestPermissions(this,
             arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION),
             PERMISSION_ID)
     }
+
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -329,6 +338,5 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
             }
         }
     }
-
 
 }
