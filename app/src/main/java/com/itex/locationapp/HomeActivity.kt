@@ -130,7 +130,7 @@ class HomeActivity: AppCompatActivity(), OnMapReadyCallback{
 
             val path: MutableList<List<LatLng>> = ArrayList()
             val urlDirections = "https://maps.googleapis.com/maps/api/directions/json?origin=${startLocations[startLocations.size-1].latitude},${startLocations[startLocations.size-1].longitude}" +
-                    "&destination=${startLat},${startLong}&key=AIzaSyDQFtmjF3fkjYkQI04WqQCzcPqUbU4CmDw"
+                    "&destination=${startLat},${startLong}&key=<your API Key here>"
 
             val directionsRequest = object : StringRequest(Request.Method.GET, urlDirections, Response.Listener<String> { response ->
                 val jsonResponse = JSONObject(response)
